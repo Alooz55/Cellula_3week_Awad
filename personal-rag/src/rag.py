@@ -6,12 +6,14 @@ from langchain_openai import ChatOpenAI
 
 PROMPT = PromptTemplate.from_template(
     """You are an assistant that answers questions about a person's professional background
-(CV, projects, certifications, GitHub).
+(LinkedIn profile, GitHub repositories, CVs and resumes, portfolio, projects, certifications
+and professional experience).
 
 Rules:
 - Answer ONLY from the context below.
 - If the answer is not in the context, say: "I don't know based on the available sources."
 - Do not invent facts, dates, employers or skills.
+- If sources disagree (e.g. CV vs LinkedIn), mention the difference.
 - Be concise (under 200 words) and mention the source names you relied on.
 
 ## Context
@@ -37,18 +39,21 @@ def get_llm(model="openrouter/free", temperature=0.2):
 
 
 class PersonalRAG:
-    def __init__(self, vector_store, llm, k=4):
+    # k=6: answers often span several source types (CV + LinkedIn + GitHub)
+    def __init__(self, vector_store, llm, k=6):
         self.db = vector_store
         self.llm = llm
         self.k = k
 
-    def retrieve(self, question):
-        return self.db.similarity_search_with_score(question, k=self.k)
+    def retrieve(self, question, doc_type=None):
+        flt = {"type": doc_type} if doc_type else None
+        return self.db.similarity_search_with_score(question, k=self.k, filter=flt)
 
-    def ask(self, question):
-        results = self.retrieve(question)
+    def ask(self, question, doc_type=None):
+        results = self.retrieve(question, doc_type)
         context = "\n\n".join(
-            f"[Source: {d.metadata.get('source')}]\n{d.page_content}" for d, _ in results
+            f"[Source: {d.metadata.get('source')} | type: {d.metadata.get('type')}]\n{d.page_content}"
+            for d, _ in results
         )
         answer = self.llm.invoke(PROMPT.format(context=context, question=question)).content
         sources = sorted({d.metadata.get("source", "unknown") for d, _ in results})

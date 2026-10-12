@@ -1,5 +1,5 @@
 """Embedding model."""
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 

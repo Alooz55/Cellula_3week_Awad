@@ -1,4 +1,4 @@
-"""Entry point: python app.py [--rebuild] [--github-user NAME] [--repos a b] [-q "question"]"""
+"""Entry point: python app.py [--rebuild] [--github-user NAME] [--repos a b] [--portfolio-url URL ...] [-q "question"]"""
 import argparse
 import sys
 
@@ -15,17 +15,22 @@ def main():
     ap.add_argument("--rebuild", action="store_true", help="re-ingest data and rebuild the index")
     ap.add_argument("--github-user", default="", help="GitHub username to ingest")
     ap.add_argument("--repos", nargs="*", default=None, help="specific repos (default: all public)")
+    ap.add_argument("--portfolio-url", nargs="*", default=None, help="portfolio / personal website URLs to ingest")
     ap.add_argument("-q", "--question", help="ask one question and exit")
     args = ap.parse_args()
 
     embeddings = get_embeddings()
 
     if args.rebuild or not index_exists():
-        docs = load_all(args.data_dir, args.github_user, args.repos)
+        docs = load_all(args.data_dir, args.github_user, args.repos, args.portfolio_url)
         if not docs:
-            sys.exit("No documents found. Add files under data/ or pass --github-user.")
+            sys.exit("No documents found. Add files under data/, or pass --github-user / --portfolio-url.")
         chunks = split_documents(docs)
-        print(f"Loaded {len(docs)} documents -> {len(chunks)} chunks")
+        by_type = {}
+        for d in docs:
+            t = d.metadata.get("type", "?")
+            by_type[t] = by_type.get(t, 0) + 1
+        print(f"Loaded {len(docs)} documents ({by_type}) -> {len(chunks)} chunks")
         db = build_vector_store(chunks, embeddings)
     else:
         db = load_vector_store(embeddings)
